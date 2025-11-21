@@ -41,10 +41,8 @@ export function RegisterForm() {
       formData.append('password', values.password)
 
       const result = await registerUser(formData)
-      if (result.error) {
+      if (result?.error) {
         setError(result.error)
-      } else {
-        router.push('/login')
       }
     })
   }

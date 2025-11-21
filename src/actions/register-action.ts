@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/db'
 import { RegisterSchema } from '@/lib/schemas'
 import bcrypt from 'bcryptjs'
+import { signIn } from '@/auth'
 
 export async function registerUser(formData: FormData) {
   const validatedFields = RegisterSchema.safeParse({
@@ -33,6 +34,12 @@ export async function registerUser(formData: FormData) {
       password: hashedPassword,
       name,
     },
+  })
+
+  await signIn('credentials', {
+    email,
+    password,
+    redirectTo: '/admin',
   })
 
   return { success: 'User created!' }

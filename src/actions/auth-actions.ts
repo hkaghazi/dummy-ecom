@@ -14,7 +14,11 @@ export async function authenticate(prevState: string | undefined, formData: Form
     if (!validatedFields.success) {
       return 'Invalid email or password format.'
     }
-    await signIn('credentials', formData)
+    await signIn('credentials', {
+      email: validatedFields.data.email,
+      password: validatedFields.data.password,
+      redirectTo: '/admin',
+    })
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {
@@ -38,7 +42,11 @@ export async function authenticateOtp(prevState: string | undefined, formData: F
     if (!validatedFields.success) {
       return 'Invalid phone number or code format.'
     }
-    await signIn('otp', formData)
+    await signIn('otp', {
+      phone: validatedFields.data.phone,
+      code: validatedFields.data.code,
+      redirectTo: '/admin',
+    })
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {
