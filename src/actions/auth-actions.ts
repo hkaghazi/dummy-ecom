@@ -21,6 +21,12 @@ export async function authenticate(prevState: string | undefined, formData: Form
     })
   } catch (error) {
     if (error instanceof AuthError) {
+      if (error.type === 'CallbackRouteError') {
+        const cause = error.cause?.err
+        if (cause instanceof Error) {
+          return cause.message
+        }
+      }
       switch (error.type) {
         case 'CredentialsSignin':
           return 'Invalid credentials.'
@@ -49,6 +55,12 @@ export async function authenticateOtp(prevState: string | undefined, formData: F
     })
   } catch (error) {
     if (error instanceof AuthError) {
+      if (error.type === 'CallbackRouteError') {
+        const cause = error.cause?.err
+        if (cause instanceof Error) {
+          return cause.message
+        }
+      }
       switch (error.type) {
         case 'CredentialsSignin':
           return 'Invalid code.'

@@ -7,11 +7,25 @@ import Google from 'next-auth/providers/google'
 import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 
+import { checkRateLimit } from '@/lib/rate-limit'
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: 'jwt' },
   secret: process.env.AUTH_SECRET,
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    async signIn({ user, account, profile }) {
+      if (user.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: user.email } })
+        if (dbUser?.isBlocked) {
+          return false // Block sign in
+        }
+      }
+      return true
+    },
+  },
   providers: [
     Google,
     Credentials({
@@ -28,8 +42,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (parsedCredentials.success) {
           const { email, password } = parsedCredentials.data
+
+          // Rate Limit
+          const isAllowed = await checkRateLimit(`login:${email}`, 5, 60)
+          if (!isAllowed) {
+            throw new Error('Too many attempts. Please try again later.')
+          }
+
           const user = await prisma.user.findUnique({ where: { email } })
           if (!user || !user.password) return null
+
+          // Blocked Check
+          if (user.isBlocked) {
+            throw new Error('User is blocked.')
+          }
+
           const passwordsMatch = await bcrypt.compare(password, user.password)
 
           if (passwordsMatch) return user
@@ -53,6 +80,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (parsedCredentials.success) {
           const { phone, code } = parsedCredentials.data
 
+          // Rate Limit
+          const isAllowed = await checkRateLimit(`login:${phone}`, 5, 60)
+          if (!isAllowed) {
+            throw new Error('Too many attempts. Please try again later.')
+          }
+
           // Verify OTP
           const otpRecord = await prisma.otp.findFirst({
             where: { phone, code, expiresAt: { gt: new Date() } },
@@ -66,6 +99,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             user = await prisma.user.create({
               data: { phone },
             })
+          }
+
+          // Blocked Check
+          if (user.isBlocked) {
+            throw new Error('User is blocked.')
           }
 
           // Delete used OTP
