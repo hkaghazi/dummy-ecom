@@ -1,16 +1,16 @@
 'use server'
 
 import { signIn } from '@/auth'
-import { LoginOtpSchema } from '@/lib/schemas'
+import { LoginOtpSchema, LoginSchema } from '@/lib/schemas'
 import { AuthError } from 'next-auth'
 
 export async function authenticate(prevState: string | undefined, formData: FormData) {
   try {
-    const validatedFields = LoginOtpSchema.safeParse({
+    const validatedFields = LoginSchema.safeParse({
       email: formData.get('email'),
       password: formData.get('password'),
     })
-
+    console.debug(validatedFields)
     if (!validatedFields.success) {
       return 'Invalid email or password format.'
     }

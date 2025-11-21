@@ -6,7 +6,7 @@ export const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
-  const isOnDashboard = req.nextUrl.pathname.startsWith('/dashboard')
+  const isOnDashboard = req.nextUrl.pathname.startsWith('/admin')
   if (isOnDashboard) {
     if (isLoggedIn) return
     return NextResponse.redirect(new URL('/login', req.nextUrl)) // Redirect unauthenticated users to login page
