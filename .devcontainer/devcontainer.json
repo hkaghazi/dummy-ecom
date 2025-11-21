@@ -6,6 +6,7 @@
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
   "features": {
     "ghcr.io/itsmechlark/features/postgresql:1": {},
+    "ghcr.io/itsmechlark/features/redis-server:1": {},
     "ghcr.io/devcontainers-extra/features/pnpm:2": {},
     "ghcr.io/devcontainers-extra/features/prisma:2": {},
     "ghcr.io/devcontainers-extra/features/prettier:1.0.2": {}
