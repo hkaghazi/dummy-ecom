@@ -1,14 +1,8 @@
 'use server'
 
 import { prisma } from '@/lib/db'
+import { RegisterSchema } from '@/lib/schemas'
 import bcrypt from 'bcryptjs'
-import { z } from 'zod'
-
-const RegisterSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().min(2),
-})
 
 export async function registerUser(formData: FormData) {
   const validatedFields = RegisterSchema.safeParse({

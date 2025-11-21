@@ -1,26 +1,82 @@
 'use client'
 
-import { useFormStatus } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { authenticate, authenticateOtp } from '@/actions/auth-actions'
 import { sendOtp } from '@/actions/otp-action'
-import { useActionState, useState } from 'react'
+import { useState, useTransition } from 'react'
 import { FcGoogle } from 'react-icons/fc'
 import { signIn } from 'next-auth/react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import { LoginSchema, LoginOtpSchema } from '@/lib/schemas'
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form'
 
 export function LoginForm() {
-  const [errorMessage, dispatch] = useActionState(authenticate, undefined)
-  const [otpErrorMessage, dispatchOtp] = useActionState(authenticateOtp, undefined)
+  const [errorMessage, setErrorMessage] = useState<string | undefined>()
+  const [otpErrorMessage, setOtpErrorMessage] = useState<string | undefined>()
+  const [isPending, startTransition] = useTransition()
   const [mode, setMode] = useState<'credentials' | 'otp'>('credentials')
   const [otpSent, setOtpSent] = useState(false)
-  const [phone, setPhone] = useState('')
 
-  const handleSendOtp = async () => {
-    if (phone.length >= 10) {
-      await sendOtp(phone)
-      setOtpSent(true)
+  const formCredentials = useForm<z.infer<typeof LoginSchema>>({
+    resolver: zodResolver(LoginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  })
+
+  const formOtp = useForm<z.infer<typeof LoginOtpSchema>>({
+    resolver: zodResolver(LoginOtpSchema),
+    defaultValues: {
+      phone: '',
+      code: '',
+    },
+  })
+
+  const onCredentialsSubmit = (values: z.infer<typeof LoginSchema>) => {
+    setErrorMessage(undefined)
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.append('email', values.email)
+      formData.append('password', values.password)
+      const error = await authenticate(undefined, formData)
+      if (error) {
+        setErrorMessage(error)
+      }
+    })
+  }
+
+  const onOtpSubmit = (values: z.infer<typeof LoginOtpSchema>) => {
+    setOtpErrorMessage(undefined)
+    if (!otpSent) {
+      // Send OTP
+      startTransition(async () => {
+        await sendOtp(values.phone)
+        setOtpSent(true)
+      })
+    } else {
+      // Verify OTP
+      startTransition(async () => {
+        const formData = new FormData()
+        formData.append('phone', values.phone)
+        if (values.code) {
+          formData.append('code', values.code)
+        }
+        const error = await authenticateOtp(undefined, formData)
+        if (error) {
+          setOtpErrorMessage(error)
+        }
+      })
     }
   }
 
@@ -30,61 +86,111 @@ export function LoginForm() {
         <Button
           variant={mode === 'credentials' ? 'default' : 'outline'}
           onClick={() => setMode('credentials')}
+          type="button"
         >
           Email
         </Button>
-        <Button variant={mode === 'otp' ? 'default' : 'outline'} onClick={() => setMode('otp')}>
+        <Button
+          variant={mode === 'otp' ? 'default' : 'outline'}
+          onClick={() => setMode('otp')}
+          type="button"
+        >
           Phone
         </Button>
       </div>
 
       {mode === 'credentials' ? (
-        <form key="credentials" action={dispatch} className="space-y-4">
-          <div>
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" type="email" required placeholder="m@example.com" />
-          </div>
-          <div>
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required />
-          </div>
-          <LoginButton />
-          <div className="flex h-8 items-end space-x-1" aria-live="polite" aria-atomic="true">
-            {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
-          </div>
-        </form>
-      ) : (
-        <form key="otp" action={dispatchOtp} className="space-y-4">
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              name="phone"
-              type="tel"
-              required
-              placeholder="1234567890"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              disabled={otpSent}
+        <Form {...formCredentials}>
+          <form onSubmit={formCredentials.handleSubmit(onCredentialsSubmit)} className="space-y-4">
+            <FormField
+              control={formCredentials.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="m@example.com"
+                      type="email"
+                      {...field}
+                      disabled={isPending}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          {otpSent && (
-            <div>
-              <Label htmlFor="code">OTP Code</Label>
-              <Input id="code" name="code" type="text" required placeholder="123456" />
-            </div>
-          )}
-          {!otpSent ? (
-            <Button type="button" onClick={handleSendOtp} className="w-full">
-              Send OTP
+            <FormField
+              control={formCredentials.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" {...field} disabled={isPending} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {isPending ? 'Logging in...' : 'Login'}
             </Button>
-          ) : (
-            <LoginButton />
-          )}
-          <div className="flex h-8 items-end space-x-1" aria-live="polite" aria-atomic="true">
-            {otpErrorMessage && <p className="text-sm text-red-500">{otpErrorMessage}</p>}
-          </div>
-        </form>
+            <div className="flex h-8 items-end space-x-1" aria-live="polite" aria-atomic="true">
+              {errorMessage && <p className="text-sm text-red-500">{errorMessage}</p>}
+            </div>
+          </form>
+        </Form>
+      ) : (
+        <Form {...formOtp}>
+          <form onSubmit={formOtp.handleSubmit(onOtpSubmit)} className="space-y-4">
+            <FormField
+              control={formOtp.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="1234567890"
+                      type="tel"
+                      {...field}
+                      disabled={isPending || otpSent}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {otpSent && (
+              <FormField
+                control={formOtp.control}
+                name="code"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>OTP Code</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123456" {...field} disabled={isPending} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+            <Button type="submit" className="w-full" disabled={isPending}>
+              {otpSent
+                ? isPending
+                  ? 'Logging in...'
+                  : 'Login'
+                : isPending
+                  ? 'Sending OTP...'
+                  : 'Send OTP'}
+            </Button>
+            <div className="flex h-8 items-end space-x-1" aria-live="polite" aria-atomic="true">
+              {otpErrorMessage && <p className="text-sm text-red-500">{otpErrorMessage}</p>}
+            </div>
+          </form>
+        </Form>
       )}
 
       <div className="relative">
@@ -101,14 +207,5 @@ export function LoginForm() {
         Google
       </Button>
     </div>
-  )
-}
-
-function LoginButton() {
-  const { pending } = useFormStatus()
-  return (
-    <Button className="w-full" aria-disabled={pending}>
-      {pending ? 'Logging in...' : 'Log in'}
-    </Button>
   )
 }

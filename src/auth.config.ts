@@ -16,7 +16,7 @@ export const authConfig = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string
-        session.user.roleId = token.roleId
+        session.user.roleId = token.roleId as string | null | undefined
       }
       return session
     },
